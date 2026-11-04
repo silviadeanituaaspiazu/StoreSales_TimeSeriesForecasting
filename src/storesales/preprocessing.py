@@ -130,12 +130,13 @@ def prep_joins(
     df = df.merge(df_transactions, how="left", on=["store_nbr", "date"])
 
     df = df.sort_values(["family", "store_nbr", "date"])
+    df["store_nbr"] = df["store_nbr"].astype("category")
 
     return df
 
 def export_to_parquet(df: pd.DataFrame, filepath: str) -> None:
     carpeta_destino = os.path.dirname(filepath)
     os.makedirs(carpeta_destino, exist_ok=True)
-    df.to_parquet(filepath)
+    df.to_parquet(filepath, index=False)
     
     print(f"Data saved at: {filepath}")
