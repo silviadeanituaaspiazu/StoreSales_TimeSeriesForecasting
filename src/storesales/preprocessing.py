@@ -2,6 +2,16 @@ import pandas as pd
 import numpy as np
 import os
 
+PATH_SALES_DATA = "data/raw/train.csv"
+PATH_STORES_DATA = "data/raw/stores.csv"
+PATH_HOLIDAYS_DATA = "data/raw/holidays_events.csv"
+PATH_TRANSACTIONS_DATA = "data/raw/transactions.csv"
+PATH_OIL_DATA = "data/raw/oil.csv"
+
+PATH_OUTPUT = "data/processed/df_train.parquet"
+
+LAGS = [15, 30, 365]
+
 
 def prep_train_df(
     df: pd.DataFrame, lags: list[int], drop_lag_nan: bool = True
@@ -81,7 +91,7 @@ def prep_holiday_df(holidays_events: pd.DataFrame) -> pd.DataFrame:
     """Add holiday_events data"""
 
     holidays_events["date"] = pd.to_datetime(holidays_events["date"])
-    holidays_events[holidays_events["transferred"] == False]
+    holidays_events = holidays_events[holidays_events["transferred"] == False]
 
     return holidays_events
 
@@ -89,9 +99,9 @@ def prep_holiday_df(holidays_events: pd.DataFrame) -> pd.DataFrame:
 def prep_joins(
     df_sales: pd.DataFrame,
     df_stores: pd.DataFrame,
-    df_holiday_events: pd.Dataframe,
+    df_holiday_events: pd.DataFrame,
     df_oil: pd.DataFrame,
-    df_transactions: pd.Dataframe,
+    df_transactions: pd.DataFrame,
 ) -> pd.DataFrame:
     """Joins all the datasets"""
 
@@ -146,41 +156,32 @@ def export_to_parquet(df: pd.DataFrame, filepath: str) -> None:
 
     print(f"Data saved at: {filepath}")
 
-
-PATH_SALES_DATA = "data/raw/train.csv"
-PATH_STORES_DATA = "data/raw/stores.csv"
-PATH_HOLIDAYS_DATA = "data/raw/holidays_events.csv"
-PATH_TRANSACTIONS_DATA = "data/raw/transactions.csv"
-PATH_OIL_DATA = "data/raw/oil.csv"
-
-PATH_OUTPUT = "data/processed/df_train.parquet"
-
-LAGS = [15, 30, 365]
+def build_features(train_raw, stores_raw, holidays_raw, transactions_raw, oil_raw, lags: list[int], drop_lag_nan: bool = True):
+    print("Processing data...")
+    train = prep_train_df(train_raw, lags, drop_lag_nan)
+    stores = prep_stores_df(stores_raw)
+    holidays = prep_holiday_df(holidays_raw)
+    transactions = prep_transactions_df(transactions_raw)
+    oil = prep_oil_df(oil_raw)
+    
+    print("Joining tables...")
+    df = prep_joins(train, stores, holidays, oil, transactions)
+    return df
 
 
 def main():
     print("Initializing data preparation...")
-
+    
     train_raw = pd.read_csv(PATH_SALES_DATA)
     stores_raw = pd.read_csv(PATH_STORES_DATA)
     holidays_raw = pd.read_csv(PATH_HOLIDAYS_DATA)
     transactions_raw = pd.read_csv(PATH_TRANSACTIONS_DATA)
     oil_raw = pd.read_csv(PATH_OIL_DATA)
 
-    print("Processing data...")
-    train = prep_train_df(train_raw, LAGS)
-    stores = prep_stores_df(stores_raw)
-    holidays = prep_holiday_df(holidays_raw)
-    transactions = prep_transactions_df(transactions_raw)
-    oil = prep_oil_df(oil_raw)
-
-    print("Joining tables...")
-    df = prep_joins(train, stores, holidays, oil, transactions)
-
-    export_to_parquet(df, PATH_OUTPUT)
-
+    df_final = build_features(train_raw, stores_raw, holidays_raw, transactions_raw, oil_raw, LAGS, drop_lag_nan=True)
+    
+    export_to_parquet(df_final, PATH_OUTPUT)
     print("Success!")
-
 
 if __name__ == "__main__":
     main()
