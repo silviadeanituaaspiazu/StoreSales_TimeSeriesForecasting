@@ -156,14 +156,23 @@ def export_to_parquet(df: pd.DataFrame, filepath: str) -> None:
 
     print(f"Data saved at: {filepath}")
 
-def build_features(train_raw, stores_raw, holidays_raw, transactions_raw, oil_raw, lags: list[int], drop_lag_nan: bool = True):
+
+def build_features(
+    train_raw,
+    stores_raw,
+    holidays_raw,
+    transactions_raw,
+    oil_raw,
+    lags: list[int],
+    drop_lag_nan: bool = True,
+):
     print("Processing data...")
     train = prep_train_df(train_raw, lags, drop_lag_nan)
     stores = prep_stores_df(stores_raw)
     holidays = prep_holiday_df(holidays_raw)
     transactions = prep_transactions_df(transactions_raw)
     oil = prep_oil_df(oil_raw)
-    
+
     print("Joining tables...")
     df = prep_joins(train, stores, holidays, oil, transactions)
     return df
@@ -171,17 +180,26 @@ def build_features(train_raw, stores_raw, holidays_raw, transactions_raw, oil_ra
 
 def main():
     print("Initializing data preparation...")
-    
+
     train_raw = pd.read_csv(PATH_SALES_DATA)
     stores_raw = pd.read_csv(PATH_STORES_DATA)
     holidays_raw = pd.read_csv(PATH_HOLIDAYS_DATA)
     transactions_raw = pd.read_csv(PATH_TRANSACTIONS_DATA)
     oil_raw = pd.read_csv(PATH_OIL_DATA)
 
-    df_final = build_features(train_raw, stores_raw, holidays_raw, transactions_raw, oil_raw, LAGS, drop_lag_nan=True)
-    
+    df_final = build_features(
+        train_raw,
+        stores_raw,
+        holidays_raw,
+        transactions_raw,
+        oil_raw,
+        LAGS,
+        drop_lag_nan=True,
+    )
+
     export_to_parquet(df_final, PATH_OUTPUT)
     print("Success!")
+
 
 if __name__ == "__main__":
     main()
