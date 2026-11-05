@@ -2,13 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 
-DROP_FIRST_DUMMIES = True
-DROP_LAG_NAN = True
-
-
-def prep_train_df(df: pd.DataFrame, lags: list[int]) -> pd.DataFrame:
+def prep_train_df(df: pd.DataFrame, lags: list[int], drop_lag_nan: bool = True) -> pd.DataFrame:
     """Preprocesses the main sales dataset by parsing dates, casting types,
-    generating temporal and lag features, and applying one-hot encoding.
+    generating temporal and lag features and getting the sales types for each family.
     """
     df = df.sort_values(["store_nbr", "family", "date"]).reset_index(drop=True)
 
@@ -23,9 +19,14 @@ def prep_train_df(df: pd.DataFrame, lags: list[int]) -> pd.DataFrame:
 
     df = prep_train_get_lags(df, lags)
 
-    if DROP_LAG_NAN:
+    if drop_lag_nan:
         max_lag = max(lags)
         df = df.dropna(subset=[f"sales_lag{max_lag}"]).reset_index(drop=True)
+
+    # Gets sales types for each family
+    is_decimal = df["sales"] % 1 != 0
+    family_has_decimals = is_decimal.groupby(df["family"], observed=True).any()
+    df["is_int_sales"] = df["family"].map(~family_has_decimals)
 
     return df
 
