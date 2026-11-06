@@ -6,6 +6,7 @@ from src.storesales.models import get_linear_regression_pipeline
 import json
 import mlflow
 import pandas as pd
+import os
 
 MODEL_REGISTRY = {
     "linear_regression": get_linear_regression_pipeline,
@@ -52,12 +53,14 @@ def run_experiment(
         mlflow.log_param("total_features", len(features))
         mlflow.log_param("cutoff", [str(c.date()) for c in cutoffs])
 
-        os.makedirs("artifacts", exist_ok=True)
-        with open("artifacts/features_list.json", "w") as f:
+        artifacts_dir = "../artifacts"
+        os.makedirs(artifacts_dir, exist_ok=True)
+            
+        features_path = os.path.join(artifacts_dir, "features_list.json")
+        with open(features_path, "w") as f:
             json.dump({"features": features}, f, indent=4)
-        mlflow.log_artifact("artifacts/features_list.json", "metadata")
-
-        mlflow.log_param("features_list", ", ".join(features))
+                
+        mlflow.log_artifact(features_path, "metadata")
 
         df_results = train_predict_evaluate(
             df,
