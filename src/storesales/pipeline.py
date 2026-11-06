@@ -1,12 +1,11 @@
-from src.storesales.training import train_predict_evaluate
-from src.storesales.visualization import plot_predictions
-from src.storesales.training import train_predict_evaluate
-from src.storesales.visualization import plot_predictions
-from src.storesales.models import get_linear_regression_pipeline
+import os
 import json
 import mlflow
 import pandas as pd
-import os
+
+from src.storesales.training import train_predict_evaluate
+from src.storesales.visualization import plot_predictions
+from src.storesales.models import get_linear_regression_pipeline
 
 MODEL_REGISTRY = {
     "linear_regression": get_linear_regression_pipeline,
@@ -36,8 +35,23 @@ def run_experiment(
     selected_model = MODEL_REGISTRY[model_name]
     run_name = f"{model_name}_{issue_name}_{version_name}"
 
-    mlflow.set_tracking_uri("sqlite:///../mlflow.db")
-    mlflow.set_experiment("Store_Sales_Forecasting")
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    db_path = os.path.join(project_root, "mlflow.db")
+    artifacts_dir = os.path.join(project_root, "artifacts")
+    mlruns_dir = os.path.join(project_root, "mlruns")
+
+    mlflow.set_tracking_uri(f"sqlite:///{db_path}")
+
+    client = mlflow.tracking.MlflowClient()
+    experiment_name = "Store_Sales_Forecasting"
+    experiment = client.get_experiment_by_name(experiment_name)
+
+    if experiment is None:
+        client.create_experiment(
+            experiment_name, artifact_location=f"file://{mlruns_dir}"
+        )
+
+    mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run(run_name=run_name):
 
@@ -53,13 +67,12 @@ def run_experiment(
         mlflow.log_param("total_features", len(features))
         mlflow.log_param("cutoff", [str(c.date()) for c in cutoffs])
 
-        artifacts_dir = "../artifacts"
         os.makedirs(artifacts_dir, exist_ok=True)
-            
         features_path = os.path.join(artifacts_dir, "features_list.json")
+
         with open(features_path, "w") as f:
             json.dump({"features": features}, f, indent=4)
-                
+
         mlflow.log_artifact(features_path, "metadata")
 
         df_results = train_predict_evaluate(

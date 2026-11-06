@@ -12,6 +12,14 @@ def plot_predictions(
     cutoff: str = "2017-07-15",
 ):
 
+    root_artifacts = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../artifacts")
+    )
+    os.makedirs(root_artifacts, exist_ok=True)
+
+    plot_filename = f"plot_predictions_{run_name}_{family_name}_{store_nbr_name}.png"
+    plot_path = os.path.join(root_artifacts, plot_filename)
+
     cutoff = pd.to_datetime(cutoff)
 
     df_results_filtered = df_results[
@@ -82,10 +90,6 @@ def plot_predictions(
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    os.makedirs("artifacts", exist_ok=True)
-    plot_path = (
-        f"artifacts/plot_predictions_{run_name}_{family_name}_{store_nbr_name}.png"
-    )
     plt.savefig(plot_path, dpi=150, bbox_inches="tight")
     plt.show()
     plt.close()
