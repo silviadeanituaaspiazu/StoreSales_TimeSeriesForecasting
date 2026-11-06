@@ -25,5 +25,8 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
+      - name: Review code format (Black)
+        run: poetry run black --check
+        
       - name: Run tests with pytest
         run: poetry run pytest -v

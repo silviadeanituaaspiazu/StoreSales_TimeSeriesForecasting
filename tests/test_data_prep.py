@@ -71,7 +71,7 @@ def test_preprocessing_main_pipeline():
     )
 
     # 1. Row count check (No join explosion)
-    assert len(df_final) <= len(train_raw), "Pipeline resulted in duplicated rows."
+    assert len(df_final) <= len(train_raw), "Too many rows."
 
     # 2. Missing values check
     assert (
