@@ -45,10 +45,9 @@ def prep_train_df(
 
 
 def prep_train_get_lags(df: pd.DataFrame, lags: list[int]) -> pd.DataFrame:
-    """Computes raw and log-transformed sales lags grouped by store and product family."""
+    """Computes sales lags grouped by store and product family."""
     for i in lags:
         df[f"sales_lag{i}"] = df.groupby(["family", "store_nbr"])["sales"].shift(i)
-        df[f"sales_lag{i}_log"] = np.log1p(df[f"sales_lag{i}"])
     return df
 
 
