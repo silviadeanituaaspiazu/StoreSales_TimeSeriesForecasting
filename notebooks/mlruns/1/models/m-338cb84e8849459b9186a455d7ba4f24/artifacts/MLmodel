@@ -1,0 +1,23 @@
+artifact_path: /Users/silviadeanituaaspiazu/VSC/learning/StoreSales-TimeSeriesForecasting/notebooks/mlruns/1/models/m-338cb84e8849459b9186a455d7ba4f24/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.skops
+    predict_fn: predict
+    python_version: 3.15.2
+  sklearn:
+    code: null
+    pickled_model: model.skops
+    serialization_format: skops
+    sklearn_version: 1.9.1
+    skops_trusted_types: null
+mlflow_version: 3.18.0
+model_id: m-338cb84e8849459b9186a455d7ba4f24
+model_size_bytes: 174501
+model_uuid: m-338cb84e8849459b9186a455d7ba4f24
+prompts: null
+run_id: 26a6594b48554a27968ea70858f72c85
+utc_time_created: '2026-11-06 16:51:53.344971'

@@ -1,0 +1,9 @@
+{
+    "features": [
+        "sales_lag15",
+        "sales_lag30",
+        "dcoilwtico",
+        "store_nbr",
+        "family"
+    ]
+}
