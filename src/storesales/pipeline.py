@@ -4,7 +4,7 @@ import mlflow
 import pandas as pd
 
 from src.storesales.training import train_predict_evaluate
-from src.storesales.visualization import plot_predictions
+from src.storesales.visualization import plot_predictions, plot_feature_importance, plot_actual_vs_predicted
 from src.storesales.models import (
     get_linear_regression_pipeline,
     get_xgboost_model,
@@ -88,7 +88,7 @@ def run_experiment(
 
         mlflow.log_artifact(features_path, "metadata")
 
-        df_results = train_predict_evaluate(
+        df_results, last_trained_model = train_predict_evaluate(
             df,
             selected_model,
             cutoffs,
@@ -104,13 +104,23 @@ def run_experiment(
         df_results.to_parquet(results_path)
         mlflow.log_artifact(results_path, "predictions")
 
-        plot_path = plot_predictions(
+        plot_predictions_path = plot_predictions(
             df,
             df_results,
             to_plot_family_name,
             to_plot_store_nbr_name,
             to_plot_cutoff,
         )
-        mlflow.log_artifact(plot_path, "visualizations")
+        mlflow.log_artifact(plot_predictions_path, "visualizations")
+
+        plot_feature_importance_path = plot_feature_importance(last_trained_model)
+        mlflow.log_artifact(plot_feature_importance_path, "visualizations")
+
+        plot_actual_pred_path = plot_actual_vs_predicted(
+            y_true=df_results["y_true"], 
+            y_pred=df_results["y_pred"]
+        )
+        mlflow.log_artifact(plot_actual_pred_path, "visualizations")
+
 
     return df_results

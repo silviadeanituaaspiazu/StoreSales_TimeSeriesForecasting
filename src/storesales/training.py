@@ -63,4 +63,4 @@ def train_predict_evaluate(
     )
 
     df_results = pd.concat(results_list)
-    return df_results
+    return df_results, model

@@ -40,8 +40,12 @@ def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
 def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
     """The parameters are not used but they are necessary for the project structure"""
 
+    preprocessor = FunctionTransformer(feature_names_out="one-to-one")
+    preprocessor.set_output(transform="pandas")
+
     pipeline = Pipeline(
         steps=[
+            ("preprocessor", preprocessor),
             (
                 "model",
                 XGBRegressor(
@@ -64,8 +68,12 @@ def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
 def get_lightgbm_model(skewed_feats, normal_feats, cat_feats):
     """The parameters are not used but they are necessary for the project structure"""
 
+    preprocessor = FunctionTransformer(feature_names_out="one-to-one")
+    preprocessor.set_output(transform="pandas")
+
     pipeline = Pipeline(
         steps=[
+            ("preprocessor", preprocessor),
             (
                 "model",
                 LGBMRegressor(
