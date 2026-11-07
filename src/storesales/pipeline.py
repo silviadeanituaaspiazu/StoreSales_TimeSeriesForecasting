@@ -4,13 +4,17 @@ import mlflow
 import pandas as pd
 
 from src.storesales.training import train_predict_evaluate
-from src.storesales.visualization import plot_predictions
-from src.storesales.models import get_linear_regression_pipeline
+from src.storesales.visualization import generate_and_log_plots
+from src.storesales.models import (
+    get_linear_regression_pipeline,
+    get_xgboost_model,
+    get_lightgbm_model,
+)
 
 MODEL_REGISTRY = {
     "linear_regression": get_linear_regression_pipeline,
-    # "xgboost": get_xgboost_pipeline,
-    # "random_forest": get_rf_pipeline,
+    "xgboost": get_xgboost_model,
+    "lightgbm": get_lightgbm_model,
 }
 
 
@@ -32,13 +36,19 @@ def run_experiment(
 ):
     df = pd.read_parquet(df_path)
     features = skewed_feats + normal_feats + cat_feats
+
+    for cat in cat_feats:
+        df[cat] = df[cat].astype("category")
+
     selected_model = MODEL_REGISTRY[model_name]
+    model_instance = selected_model(skewed_feats, normal_feats, cat_feats)
     run_name = f"{model_name}_{issue_name}_{version_name}"
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     db_path = os.path.join(project_root, "mlflow.db")
     artifacts_dir = os.path.join(project_root, "artifacts")
     mlruns_dir = os.path.join(project_root, "mlruns")
+    results_path = os.path.join(artifacts_dir, f"predictions/pred_{run_name}.parquet")
 
     mlflow.set_tracking_uri(f"sqlite:///{db_path}")
 
@@ -67,15 +77,18 @@ def run_experiment(
         mlflow.log_param("total_features", len(features))
         mlflow.log_param("cutoff", [str(c.date()) for c in cutoffs])
 
+        algo = model_instance.named_steps["model"]
+        mlflow.log_params(algo.get_params())
+
         os.makedirs(artifacts_dir, exist_ok=True)
-        features_path = os.path.join(artifacts_dir, "features_list.json")
+        features_path = os.path.join(artifacts_dir, "features_list_temp.json")
 
         with open(features_path, "w") as f:
             json.dump({"features": features}, f, indent=4)
 
         mlflow.log_artifact(features_path, "metadata")
 
-        df_results = train_predict_evaluate(
+        df_results, last_trained_model = train_predict_evaluate(
             df,
             selected_model,
             cutoffs,
@@ -87,14 +100,18 @@ def run_experiment(
             cols_to_keep,
         )
 
-        plot_path = plot_predictions(
-            df,
-            df_results,
-            run_name,
-            to_plot_family_name,
-            to_plot_store_nbr_name,
-            to_plot_cutoff,
+        os.makedirs(os.path.dirname(results_path), exist_ok=True)
+        df_results.to_parquet(results_path)
+        mlflow.log_artifact(results_path, "predictions")
+
+        plot_config = {
+            "family_name": to_plot_family_name,
+            "store_nbr": to_plot_store_nbr_name,
+            "cutoff": to_plot_cutoff,
+        }
+
+        generate_and_log_plots(
+            df=df, df_results=df_results, model=last_trained_model, config=plot_config
         )
-        mlflow.log_artifact(plot_path, "visualizations")
 
     return df_results

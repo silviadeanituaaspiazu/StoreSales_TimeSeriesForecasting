@@ -44,6 +44,7 @@ def train_predict_evaluate(
         res["cutoff"] = cutoff
         res["y_true"] = y_test
         res["y_pred"] = y_pred
+        res["forecast_step"] = (res["date"] - res["cutoff"]).dt.days
 
         mask = res["is_int_sales"] == True
         res.loc[mask, "y_pred"] = res.loc[mask, "y_pred"].round()
@@ -58,7 +59,9 @@ def train_predict_evaluate(
     print(f"GLOBAL RMSLE: {avg_rmsle:.4f}")
 
     mlflow.log_metric("global_rmsle", avg_rmsle)
-    mlflow.sklearn.log_model(sk_model=model, name="pipeline_model")
+    mlflow.sklearn.log_model(
+        model, "pipeline_model", serialization_format="cloudpickle"
+    )
 
     df_results = pd.concat(results_list)
-    return df_results
+    return df_results, model
