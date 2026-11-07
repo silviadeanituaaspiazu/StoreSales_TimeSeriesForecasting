@@ -6,19 +6,17 @@ import os
 def plot_predictions(
     df: pd.DataFrame,
     df_results: pd.DataFrame,
-    run_name: str,
     family_name: str = "AUTOMOTIVE",
     store_nbr_name: int = 20,
     cutoff: str = "2017-07-15",
 ):
 
     root_artifacts = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../artifacts")
+        os.path.join(os.path.dirname(__file__), "../../artifacts/plots")
     )
     os.makedirs(root_artifacts, exist_ok=True)
 
-    plot_filename = f"plot_predictions_{run_name}_{family_name}_{store_nbr_name}.png"
-    plot_path = os.path.join(root_artifacts, plot_filename)
+    plot_path = os.path.join(root_artifacts, "plot_predictions_temp.png")
 
     cutoff = pd.to_datetime(cutoff)
 

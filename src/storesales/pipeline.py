@@ -41,12 +41,14 @@ def run_experiment(
         df[cat] = df[cat].astype("category")
 
     selected_model = MODEL_REGISTRY[model_name]
+    model_instance = selected_model(skewed_feats, normal_feats, cat_feats)
     run_name = f"{model_name}_{issue_name}_{version_name}"
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     db_path = os.path.join(project_root, "mlflow.db")
     artifacts_dir = os.path.join(project_root, "artifacts")
     mlruns_dir = os.path.join(project_root, "mlruns")
+    results_path = os.path.join(artifacts_dir, f"predictions/pred_{run_name}.parquet")
 
     mlflow.set_tracking_uri(f"sqlite:///{db_path}")
 
@@ -75,8 +77,11 @@ def run_experiment(
         mlflow.log_param("total_features", len(features))
         mlflow.log_param("cutoff", [str(c.date()) for c in cutoffs])
 
+        model_params = model_instance.get_params()
+        mlflow.log_params(model_params)
+
         os.makedirs(artifacts_dir, exist_ok=True)
-        features_path = os.path.join(artifacts_dir, "features_list.json")
+        features_path = os.path.join(artifacts_dir, "features_list_temp.json")
 
         with open(features_path, "w") as f:
             json.dump({"features": features}, f, indent=4)
@@ -95,10 +100,13 @@ def run_experiment(
             cols_to_keep,
         )
 
+        os.makedirs(os.path.dirname(results_path), exist_ok=True)
+        df_results.to_parquet(results_path)
+        mlflow.log_artifact(results_path, "predictions")
+
         plot_path = plot_predictions(
             df,
             df_results,
-            run_name,
             to_plot_family_name,
             to_plot_store_nbr_name,
             to_plot_cutoff,
