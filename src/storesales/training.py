@@ -44,6 +44,7 @@ def train_predict_evaluate(
         res["cutoff"] = cutoff
         res["y_true"] = y_test
         res["y_pred"] = y_pred
+        res["forecast_step"] = (res["date"] - res["cutoff"]).dt.days
 
         mask = res["is_int_sales"] == True
         res.loc[mask, "y_pred"] = res.loc[mask, "y_pred"].round()

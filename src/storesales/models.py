@@ -52,6 +52,7 @@ def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
                     n_estimators=200,
                     max_depth=6,
                     learning_rate=0.05,
+                    objective="reg:squaredlogerror",
                     #   subsample=0.8,
                     #   col_sample_by_tree=0.8,
                     random_state=42,
@@ -59,7 +60,7 @@ def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
                     enable_categorical=True,
                     tree_method="hist",
                 ),
-            )
+            ),
         ]
     )
     return pipeline
@@ -80,10 +81,11 @@ def get_lightgbm_model(skewed_feats, normal_feats, cat_feats):
                     n_estimators=300,
                     max_depth=7,
                     learning_rate=0.05,
+                    objective="reg:squaredlogerror",
                     random_state=42,
                     verbose=-1,
                 ),
-            )
+            ),
         ]
     )
     return pipeline

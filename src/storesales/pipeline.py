@@ -4,7 +4,7 @@ import mlflow
 import pandas as pd
 
 from src.storesales.training import train_predict_evaluate
-from src.storesales.visualization import plot_predictions, plot_feature_importance, plot_actual_vs_predicted
+from src.storesales.visualization import generate_and_log_plots
 from src.storesales.models import (
     get_linear_regression_pipeline,
     get_xgboost_model,
@@ -77,8 +77,8 @@ def run_experiment(
         mlflow.log_param("total_features", len(features))
         mlflow.log_param("cutoff", [str(c.date()) for c in cutoffs])
 
-        model_params = model_instance.get_params()
-        mlflow.log_params(model_params)
+        algo = model_instance.named_steps["model"]
+        mlflow.log_params(algo.get_params())
 
         os.makedirs(artifacts_dir, exist_ok=True)
         features_path = os.path.join(artifacts_dir, "features_list_temp.json")
@@ -104,23 +104,14 @@ def run_experiment(
         df_results.to_parquet(results_path)
         mlflow.log_artifact(results_path, "predictions")
 
-        plot_predictions_path = plot_predictions(
-            df,
-            df_results,
-            to_plot_family_name,
-            to_plot_store_nbr_name,
-            to_plot_cutoff,
+        plot_config = {
+            "family_name": to_plot_family_name,
+            "store_nbr": to_plot_store_nbr_name,
+            "cutoff": to_plot_cutoff,
+        }
+
+        generate_and_log_plots(
+            df=df, df_results=df_results, model=last_trained_model, config=plot_config
         )
-        mlflow.log_artifact(plot_predictions_path, "visualizations")
-
-        plot_feature_importance_path = plot_feature_importance(last_trained_model)
-        mlflow.log_artifact(plot_feature_importance_path, "visualizations")
-
-        plot_actual_pred_path = plot_actual_vs_predicted(
-            y_true=df_results["y_true"], 
-            y_pred=df_results["y_pred"]
-        )
-        mlflow.log_artifact(plot_actual_pred_path, "visualizations")
-
 
     return df_results
