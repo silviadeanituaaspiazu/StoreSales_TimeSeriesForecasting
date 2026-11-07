@@ -5,12 +5,16 @@ import pandas as pd
 
 from src.storesales.training import train_predict_evaluate
 from src.storesales.visualization import plot_predictions
-from src.storesales.models import get_linear_regression_pipeline
+from src.storesales.models import (
+    get_linear_regression_pipeline,
+    get_xgboost_model,
+    get_lightgbm_model,
+)
 
 MODEL_REGISTRY = {
     "linear_regression": get_linear_regression_pipeline,
-    # "xgboost": get_xgboost_pipeline,
-    # "random_forest": get_rf_pipeline,
+    "xgboost": get_xgboost_model,
+    "lightgbm": get_lightgbm_model,
 }
 
 
@@ -32,6 +36,10 @@ def run_experiment(
 ):
     df = pd.read_parquet(df_path)
     features = skewed_feats + normal_feats + cat_feats
+
+    for cat in cat_feats:
+        df[cat] = df[cat].astype("category")
+
     selected_model = MODEL_REGISTRY[model_name]
     run_name = f"{model_name}_{issue_name}_{version_name}"
 

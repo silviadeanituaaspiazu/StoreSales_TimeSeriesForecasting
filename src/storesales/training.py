@@ -58,7 +58,9 @@ def train_predict_evaluate(
     print(f"GLOBAL RMSLE: {avg_rmsle:.4f}")
 
     mlflow.log_metric("global_rmsle", avg_rmsle)
-    mlflow.sklearn.log_model(sk_model=model, name="pipeline_model")
+    mlflow.sklearn.log_model(
+        model, "pipeline_model", serialization_format="cloudpickle"
+    )
 
     df_results = pd.concat(results_list)
     return df_results

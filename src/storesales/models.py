@@ -3,6 +3,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import TransformedTargetRegressor, ColumnTransformer
 from sklearn.linear_model import LinearRegression
 import numpy as np
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
 
 
 def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
@@ -33,3 +35,47 @@ def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
         ]
     )
     return model
+
+
+def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
+    """The parameters are not used but they are necessary for the project structure"""
+
+    pipeline = Pipeline(
+        steps=[
+            (
+                "model",
+                XGBRegressor(
+                    n_estimators=200,
+                    max_depth=6,
+                    learning_rate=0.05,
+                    #   subsample=0.8,
+                    #   col_sample_by_tree=0.8,
+                    random_state=42,
+                    verbosity=0,
+                    enable_categorical=True,
+                    tree_method="hist",
+                ),
+            )
+        ]
+    )
+    return pipeline
+
+
+def get_lightgbm_model(skewed_feats, normal_feats, cat_feats):
+    """The parameters are not used but they are necessary for the project structure"""
+
+    pipeline = Pipeline(
+        steps=[
+            (
+                "model",
+                LGBMRegressor(
+                    n_estimators=300,
+                    max_depth=7,
+                    learning_rate=0.05,
+                    random_state=42,
+                    verbose=-1,
+                ),
+            )
+        ]
+    )
+    return pipeline
