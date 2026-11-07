@@ -9,7 +9,9 @@ from lightgbm import LGBMRegressor
 
 def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
 
-    log_transformer = FunctionTransformer(np.log1p, validate=True)
+    log_transformer = FunctionTransformer(
+        np.log1p, validate=True, feature_names_out="one-to-one"
+    )
 
     skewed_pipeline = Pipeline(
         steps=[("log", log_transformer), ("scaler", StandardScaler())]
@@ -43,26 +45,21 @@ def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
     preprocessor = FunctionTransformer(feature_names_out="one-to-one")
     preprocessor.set_output(transform="pandas")
 
-    pipeline = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            (
-                "model",
-                XGBRegressor(
-                    n_estimators=200,
-                    max_depth=6,
-                    learning_rate=0.05,
-                    objective="reg:squaredlogerror",
-                    #   subsample=0.8,
-                    #   col_sample_by_tree=0.8,
-                    random_state=42,
-                    verbosity=0,
-                    enable_categorical=True,
-                    tree_method="hist",
-                ),
-            ),
-        ]
+    base_xgb = XGBRegressor(
+        n_estimators=200,
+        max_depth=6,
+        learning_rate=0.05,
+        random_state=42,
+        verbosity=0,
+        enable_categorical=True,
+        tree_method="hist",
     )
+
+    model = TransformedTargetRegressor(
+        regressor=base_xgb, func=np.log1p, inverse_func=np.expm1
+    )
+
+    pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
     return pipeline
 
 
@@ -72,20 +69,17 @@ def get_lightgbm_model(skewed_feats, normal_feats, cat_feats):
     preprocessor = FunctionTransformer(feature_names_out="one-to-one")
     preprocessor.set_output(transform="pandas")
 
-    pipeline = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            (
-                "model",
-                LGBMRegressor(
-                    n_estimators=300,
-                    max_depth=7,
-                    learning_rate=0.05,
-                    objective="reg:squaredlogerror",
-                    random_state=42,
-                    verbose=-1,
-                ),
-            ),
-        ]
+    base_lgbm = LGBMRegressor(
+        n_estimators=300,
+        max_depth=7,
+        learning_rate=0.05,
+        random_state=42,
+        verbose=-1,
     )
+
+    model = TransformedTargetRegressor(
+        regressor=base_lgbm, func=np.log1p, inverse_func=np.expm1
+    )
+
+    pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
     return pipeline

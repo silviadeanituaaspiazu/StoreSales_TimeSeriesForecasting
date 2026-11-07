@@ -34,6 +34,7 @@ def plot_rmsle_by_step(df_results, root_artifacts):
         "RMSLE Degradation by Forecast Step", fontsize=14, fontweight="bold", pad=15
     )
     plt.xticks(np.array(steps).astype(int))
+    plt.ylim(0, 1.5)
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.legend(loc="upper left", frameon=True)
     plt.tight_layout()
@@ -85,6 +86,9 @@ def plot_feature_importance(model, root_artifacts):
 
     final_model = model.named_steps["model"]
     col_names = model.named_steps["preprocessor"].get_feature_names_out()
+
+    if hasattr(final_model, "regressor_"):
+        final_model = final_model.regressor_
 
     if hasattr(final_model, "feature_importances_"):
         importance = final_model.feature_importances_
@@ -220,8 +224,7 @@ def generate_and_log_plots(df, df_results, model, config):
     mlflow.log_artifact(path_predictions, "visualizations")
 
     path_importance = plot_feature_importance(model, root_artifacts)
-    if path_importance:
-        mlflow.log_artifact(path_importance, "visualizations")
+    mlflow.log_artifact(path_importance, "visualizations")
 
     path_actual_pred = plot_actual_vs_predicted(
         df_results["y_true"], df_results["y_pred"], root_artifacts
