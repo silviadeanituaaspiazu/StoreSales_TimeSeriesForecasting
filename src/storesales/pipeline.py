@@ -88,7 +88,7 @@ def run_experiment(
 
         mlflow.log_artifact(features_path, "metadata")
 
-        df_results, last_trained_model = train_predict_evaluate(
+        df_results, trained_models = train_predict_evaluate(
             df,
             selected_model,
             cutoffs,
@@ -110,8 +110,9 @@ def run_experiment(
             "cutoff": to_plot_cutoff,
         }
 
+        last_trained_model = list(trained_models.values())[-1]
         generate_and_log_plots(
             df=df, df_results=df_results, model=last_trained_model, config=plot_config
         )
 
-    return df_results
+    return df_results, trained_models

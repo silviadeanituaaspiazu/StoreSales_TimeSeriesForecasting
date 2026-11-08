@@ -1,6 +1,7 @@
 import mlflow.sklearn
 import pandas as pd
 import numpy as np
+import mlflow
 
 from src.storesales.metrics import accuracy_evaluation
 
@@ -22,13 +23,15 @@ def train_predict_evaluate(
     results_list = []
     metrics_list = []
 
+    models_dict = {}
+
     features = skewed_feats + normal_feats + cat_feats
 
     for i, cutoff in enumerate(cutoffs):
         model = model_builder_fn(skewed_feats, normal_feats, cat_feats)
 
         train_df = df[df["date"] < cutoff]
-        test_df = df[(df["date"] >= cutoff) & (df["date"] <= (cutoff + horizon_days))]
+        test_df = df[(df["date"] >= cutoff) & (df["date"] < (cutoff + horizon_days))]
 
         X_train, X_test = train_df[features], test_df[features]
         y_train, y_test = train_df[target], test_df[target]
@@ -44,7 +47,7 @@ def train_predict_evaluate(
         res["cutoff"] = cutoff
         res["y_true"] = y_test
         res["y_pred"] = y_pred
-        res["forecast_step"] = (res["date"] - res["cutoff"]).dt.days
+        res["forecast_step"] = (res["date"] - res["cutoff"]).dt.days + 1
 
         mask = res["is_int_sales"] == True
         res.loc[mask, "y_pred"] = res.loc[mask, "y_pred"].round()
@@ -55,6 +58,11 @@ def train_predict_evaluate(
 
         mlflow.log_metric(f"rmsle_fold_{i+1}", fold_metrics["rmsle"])
 
+        models_dict[cutoff] = model
+        mlflow.sklearn.log_model(
+            model, f"pipeline_model_fold_{i+1}", serialization_format="cloudpickle"
+        )
+
     avg_rmsle = np.mean([m["rmsle"] for m in metrics_list])
     print(f"GLOBAL RMSLE: {avg_rmsle:.4f}")
 
@@ -64,4 +72,4 @@ def train_predict_evaluate(
     )
 
     df_results = pd.concat(results_list)
-    return df_results, model
+    return df_results, models_dict

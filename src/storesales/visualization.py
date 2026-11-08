@@ -44,13 +44,13 @@ def plot_rmsle_by_step(df_results, root_artifacts):
     return plot_path
 
 
-def plot_actual_vs_predicted(y_true, y_pred, root_artifacts):
+def plot_actual_vs_predicted(df_results, root_artifacts):
     plot_path = os.path.join(root_artifacts, "plot_actual_vs_predicted_temp.png")
 
     plt.figure(figsize=(10, 6))
     plt.scatter(
-        y_true,
-        y_pred,
+        x=df_results["y_true"],
+        y=df_results["y_pred"],
         alpha=0.4,
         color="dodgerblue",
         edgecolors="white",
@@ -58,7 +58,7 @@ def plot_actual_vs_predicted(y_true, y_pred, root_artifacts):
         label="Predictions",
     )
 
-    max_val = max(np.max(y_true), np.max(y_pred))
+    max_val = max(np.max(df_results["y_true"]), np.max(df_results["y_pred"]))
     plt.plot(
         [0, max_val],
         [0, max_val],
@@ -226,9 +226,7 @@ def generate_and_log_plots(df, df_results, model, config):
     path_importance = plot_feature_importance(model, root_artifacts)
     mlflow.log_artifact(path_importance, "visualizations")
 
-    path_actual_pred = plot_actual_vs_predicted(
-        df_results["y_true"], df_results["y_pred"], root_artifacts
-    )
+    path_actual_pred = plot_actual_vs_predicted(df_results, root_artifacts)
     mlflow.log_artifact(path_actual_pred, "visualizations")
 
     path_rmsle = plot_rmsle_by_step(df_results, root_artifacts)

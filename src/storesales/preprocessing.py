@@ -10,7 +10,7 @@ PATH_OIL_DATA = "data/raw/oil.csv"
 
 PATH_OUTPUT = "data/processed/df_train.parquet"
 
-LAGS = [15, 30, 365]
+LAGS = [15, 16, 17, 18, 19, 20, 30, 60, 90, 364, 365]
 
 
 def prep_train_df(
@@ -30,6 +30,8 @@ def prep_train_df(
     df["week"] = df["date"].dt.isocalendar().week
     df["year"] = df["date"].dt.year
 
+    df = fulfill_sales(df)
+
     df = prep_train_get_lags(df, lags)
 
     if drop_lag_nan:
@@ -44,8 +46,28 @@ def prep_train_df(
     return df
 
 
+def fulfill_sales(df: pd.DataFrame):
+    """Fulfill days without sales"""
+
+    df_stores = pd.DataFrame({"store_nbr": df["store_nbr"].unique()})
+    df_families = pd.DataFrame({"family": df["family"].unique()})
+    df_dates = pd.DataFrame({"date": pd.date_range(df["date"].min(), df["date"].max())})
+
+    df_calendar = df_stores.merge(df_families, how="cross").merge(df_dates, how="cross")
+
+    df = df_calendar.merge(df, on=["store_nbr", "family", "date"], how="left")
+
+    df["sales_missing"] = df["sales"].isna().astype(int)
+
+    df["sales"] = df["sales"].fillna(0)
+    df["onpromotion"] = df["onpromotion"].fillna(0)
+    return df
+
+
 def prep_train_get_lags(df: pd.DataFrame, lags: list[int]) -> pd.DataFrame:
     """Computes sales lags grouped by store and product family."""
+
+    df = df.sort_values(["family", "store_nbr", "date"]).reset_index(drop=True)
     for i in lags:
         df[f"sales_lag{i}"] = df.groupby(["family", "store_nbr"])["sales"].shift(i)
     return df
@@ -142,8 +164,8 @@ def prep_joins(
     # Joins with transactions dataset
     df = df.merge(df_transactions, how="left", on=["store_nbr", "date"])
 
-    df = df.sort_values(["family", "store_nbr", "date"])
     df["store_nbr"] = df["store_nbr"].astype("category")
+    df = df.sort_values(["family", "store_nbr", "date"])
 
     return df
 
