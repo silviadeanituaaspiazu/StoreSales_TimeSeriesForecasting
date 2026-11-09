@@ -8,7 +8,7 @@ PATH_HOLIDAYS_DATA = "data/raw/holidays_events.csv"
 PATH_TRANSACTIONS_DATA = "data/raw/transactions.csv"
 PATH_OIL_DATA = "data/raw/oil.csv"
 
-PATH_OUTPUT = "data/processed/df_train.parquet"
+PATH_OUTPUT = "data/processed/df_train_.parquet"
 
 LAGS = [15, 16, 17, 18, 19, 20, 30, 60, 90, 364, 365]
 
@@ -22,9 +22,7 @@ def prep_train_df(
     df = df.sort_values(["store_nbr", "family", "date"]).reset_index(drop=True)
 
     df["date"] = pd.to_datetime(df["date"])
-    df["onpromotion"] = df["onpromotion"].astype("category")
-    df["store_nbr"] = df["store_nbr"].astype("category")
-    df["family"] = df["family"].astype("category")
+
     df["weekday"] = df["date"].dt.day_of_week
     df["month"] = df["date"].dt.month
     df["week"] = df["date"].dt.isocalendar().week
@@ -89,11 +87,8 @@ def prep_oil_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def prep_stores_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocesses the main sales dataset by casting types"""
+    """Preprocesses the main sales dataset"""
 
-    df["store_nbr"] = df["store_nbr"].astype("category")
-    df["cluster"] = df["cluster"].astype("category")
-    df["type"] = df["type"].astype("category")
     df = df.rename(columns={"type": "store_type", "cluster": "store_cluster"})
 
     return df
@@ -103,7 +98,6 @@ def prep_transactions_df(transactions: pd.DataFrame) -> pd.DataFrame:
     """Add transactions data"""
 
     transactions["date"] = pd.to_datetime(transactions["date"])
-    transactions["store_nbr"] = transactions["store_nbr"].astype("category")
 
     return transactions
 
@@ -164,7 +158,6 @@ def prep_joins(
     # Joins with transactions dataset
     df = df.merge(df_transactions, how="left", on=["store_nbr", "date"])
 
-    df["store_nbr"] = df["store_nbr"].astype("category")
     df = df.sort_values(["family", "store_nbr", "date"])
 
     return df

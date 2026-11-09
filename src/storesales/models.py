@@ -43,7 +43,18 @@ def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
     """The parameters are not used but they are necessary for the project structure"""
 
     preprocessor = FunctionTransformer(feature_names_out="one-to-one")
+    cat_transformer = FunctionTransformer(
+        lambda x: x.astype(str).astype("category"), feature_names_out="one-to-one"
+    )
     preprocessor.set_output(transform="pandas")
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("cat", cat_transformer, cat_feats),
+            ("num", "passthrough", normal_feats),
+        ],
+        remainder="drop",
+    )
 
     base_xgb = XGBRegressor(
         n_estimators=200,

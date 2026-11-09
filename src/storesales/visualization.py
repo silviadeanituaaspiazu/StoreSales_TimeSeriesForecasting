@@ -91,6 +91,8 @@ def plot_feature_importance(model, root_artifacts):
         final_model = final_model.regressor_
 
     if hasattr(final_model, "feature_importances_"):
+        if final_model.__class__.__name__ == "LGBMRegressor":
+            final_model.importance_type = "gain"
         importance = final_model.feature_importances_
     elif hasattr(final_model, "coef_"):
         importance = final_model.coef_
