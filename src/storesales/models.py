@@ -1,4 +1,9 @@
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransformer
+from sklearn.preprocessing import (
+    StandardScaler,
+    OneHotEncoder,
+    FunctionTransformer,
+    TargetEncoder,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.compose import TransformedTargetRegressor, ColumnTransformer
 from sklearn.linear_model import LinearRegression
@@ -7,7 +12,19 @@ from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 
 
-def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
+def get_linear_regression_pipeline(
+    skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder: bool = False
+):
+    """Gets the linear model. The target encoder function is not available"""
+
+    if target_encoder:
+        raise NotImplementedError(
+            "Target Encoding is not supported for Linear Regression in this pipeline. "
+            "Please run with target_encoder=False."
+        )
+    
+    tier_cols = [f"{col}_volume_tier" for col in tier_feats] if tier_feats else []
+    all_normal_feats = normal_feats + tier_cols
 
     log_transformer = FunctionTransformer(
         np.log1p, validate=True, feature_names_out="one-to-one"
@@ -20,12 +37,12 @@ def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
     preprocessor = ColumnTransformer(
         transformers=[
             ("num_skewed", skewed_pipeline, skewed_feats),
-            ("num_normal", StandardScaler(), normal_feats),
+            ("num_normal", StandardScaler(), all_normal_feats),
             ("cat", OneHotEncoder(handle_unknown="ignore"), cat_feats),
         ]
     )
 
-    model = Pipeline(
+    pipeline = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
             (
@@ -36,24 +53,37 @@ def get_linear_regression_pipeline(skewed_feats, normal_feats, cat_feats):
             ),
         ]
     )
-    return model
+    return pipeline
 
 
-def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
-    """The parameters are not used but they are necessary for the project structure"""
+def _get_tree_preprocessor(
+    skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder: bool
+):
+    """Helper function to build the preprocessor for tree-based models."""
+    tier_cols = [f"{col}_volume_tier" for col in tier_feats] if tier_feats else []
+    all_num_feats = normal_feats + skewed_feats + tier_cols
 
-    preprocessor = FunctionTransformer(feature_names_out="one-to-one")
-    cat_transformer = FunctionTransformer(
-        lambda x: x.astype(str).astype("category"), feature_names_out="one-to-one"
-    )
-    preprocessor.set_output(transform="pandas")
+    if target_encoder:
+        cat_transformer = TargetEncoder(target_type="continuous", random_state=42)
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ("cat", cat_transformer, cat_feats),
+                ("num", "passthrough", all_num_feats),
+            ],
+            remainder="drop",
+        )
+    else:
+        preprocessor = FunctionTransformer(feature_names_out="one-to-one")
+        preprocessor.set_output(transform="pandas")
+        
+    return preprocessor
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("cat", cat_transformer, cat_feats),
-            ("num", "passthrough", normal_feats),
-        ],
-        remainder="drop",
+
+def get_xgboost_model(
+    skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder: bool = False
+):
+    preprocessor = _get_tree_preprocessor(
+        skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder
     )
 
     base_xgb = XGBRegressor(
@@ -74,11 +104,12 @@ def get_xgboost_model(skewed_feats, normal_feats, cat_feats):
     return pipeline
 
 
-def get_lightgbm_model(skewed_feats, normal_feats, cat_feats):
-    """The parameters are not used but they are necessary for the project structure"""
-
-    preprocessor = FunctionTransformer(feature_names_out="one-to-one")
-    preprocessor.set_output(transform="pandas")
+def get_lightgbm_model(
+    skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder: bool = False
+):
+    preprocessor = _get_tree_preprocessor(
+        skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder
+    )
 
     base_lgbm = LGBMRegressor(
         n_estimators=300,
