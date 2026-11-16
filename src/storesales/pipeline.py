@@ -47,31 +47,30 @@ def run_experiment(
     model_instance = selected_model(
         skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder
     )
-    
+
     run_name = f"{model_name}_{issue_name}_{version_name}"
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     artifacts_dir = os.path.join(project_root, "artifacts")
     results_path = os.path.join(artifacts_dir, f"predictions/pred_{run_name}.parquet")
-    
+
     # Rutas absolutas para MLflow
     db_path = os.path.join(project_root, "mlflow.db")
     mlruns_dir = os.path.join(project_root, "mlruns")
 
     # 1. Conectar a la base de datos principal
     mlflow.set_tracking_uri(f"sqlite:///{db_path}")
-    
+
     experiment_name = "Store_Sales_Forecasting"
     client = mlflow.tracking.MlflowClient()
-    
+
     # 2. Replicamos tu lógica infalible para fijar la ruta de artifacts en la raíz
     experiment = client.get_experiment_by_name(experiment_name)
     if experiment is None:
         client.create_experiment(
-            name=experiment_name,
-            artifact_location=f"file://{mlruns_dir}"
+            name=experiment_name, artifact_location=f"file://{mlruns_dir}"
         )
-    
+
     # 3. Activamos el experimento
     mlflow.set_experiment(experiment_name)
 
@@ -81,19 +80,17 @@ def run_experiment(
         dataset = mlflow.data.from_pandas(df, source=df_path, name=dataset_name)
         mlflow.log_input(dataset, context="training")
 
-        mlflow.set_tags({
-            "issue": issue_name,
-            "version": version_name,
-            "data": "valid"
-        })
+        mlflow.set_tags({"issue": issue_name, "version": version_name, "data": "valid"})
 
-        mlflow.log_params({
-            "model_type": model_name,
-            "horizon_days": horizon,
-            "total_features": len(features),
-            "target_encoder": target_encoder,
-            "cutoff": [str(c)[:10] for c in cutoffs]
-        })
+        mlflow.log_params(
+            {
+                "model_type": model_name,
+                "horizon_days": horizon,
+                "total_features": len(features),
+                "target_encoder": target_encoder,
+                "cutoff": [str(c)[:10] for c in cutoffs],
+            }
+        )
 
         algo_wrapper = model_instance.named_steps["model"]
         base_algo = algo_wrapper.regressor

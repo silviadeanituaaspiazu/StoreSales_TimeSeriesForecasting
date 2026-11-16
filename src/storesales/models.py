@@ -22,7 +22,7 @@ def get_linear_regression_pipeline(
             "Target Encoding is not supported for Linear Regression in this pipeline. "
             "Please run with target_encoder=False."
         )
-    
+
     tier_cols = [f"{col}_volume_tier" for col in tier_feats] if tier_feats else []
     all_normal_feats = normal_feats + tier_cols
 
@@ -75,7 +75,7 @@ def _get_tree_preprocessor(
     else:
         preprocessor = FunctionTransformer(feature_names_out="one-to-one")
         preprocessor.set_output(transform="pandas")
-        
+
     return preprocessor
 
 

@@ -44,7 +44,9 @@ def train_predict_evaluate(
                 n_tiers=N_TIERS,
             )
 
-        model = model_builder_fn(skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder)
+        model = model_builder_fn(
+            skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder
+        )
 
         train_df = df[df["date"] < cutoff]
         test_df = df[(df["date"] >= cutoff) & (df["date"] < (cutoff + horizon_days))]

@@ -2,7 +2,35 @@
 
 An end-to-end machine learning project to predict store sales for Corporación Favorita (Ecuador).
 
-This project goes beyond standard Jupyter Notebook experimentation by wrapping the entire data science lifecycle in a production-ready MLOps architecture. By prioritizing testability and CI/CD from day one, it ensures that the EDA and modeling phases are built on a highly reliable data foundation.
+This project goes beyond standard Jupyter Notebook experimentation by wrapping the entire data science lifecycle in a production-ready MLOps architecture. By prioritizing testability, it ensures that the EDA and modeling phases are built on a highly reliable data foundation.
+
+## Business Problem
+
+
+## EDA Insights
+
+ver aggregada toda la serie
+mostrar mapa con bolas en funcion de la cantidad de ventas
+mostrar las ventas totales para top 10 familias y button 10
+mostrar las ventas totales para top 10 tiendas y button 10
+ver si estacionalidad igual para las 10 primeras familias y/o 10 ultimas
+distribucion en histograma de las ventas
+
+
+MODELING
+mostrar los cutoffs elegidos. con las ventas totales y las predicciones (o valores reales)
+descomponer la serie en tendencia estacionalidad y ruido?
+
+RESULTS
+mostrar ejemplo de prediccion.
+mostrar feature importance
+mostrar actual vs predicted
+mostrar residuals distribution
+
+
+
+
+
 
 ## 🎯 Project Lifecycle
 
