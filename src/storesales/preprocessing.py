@@ -10,7 +10,34 @@ PATH_OIL_DATA = "data/raw/oil.csv"
 
 PATH_OUTPUT = "data/processed/df_train.parquet"
 
-LAGS = [15, 30, 365]
+LAGS = [15, 16, 17, 18, 19, 20, 30, 60, 90, 364, 365]
+
+REGULAR_HOLIDAY_LIST = [
+    "Carnaval",
+    "Dia de Difuntos",
+    "Independencia de Cuenca",
+    "Viernes Santo",
+    "Dia del Trabajo",
+    "Primer Grito de Independencia",
+    "Traslado Primer Grito de Independencia",
+    "Batalla de Pichincha",
+    "Traslado Batalla de Pichincha",
+    "Independencia de Guayaquil",
+    "Traslado Independencia de Guayaquil",
+    "Puente Navidad",
+    "Recupero puente Navidad",
+    "Puente Primer dia del ano",
+    "Recupero puente primer dia del ano",
+    "Puente Dia de Difuntos",
+]
+
+COMMERCIAL_SPIKE_LIST = [
+    "Black Friday",
+    "Cyber Monday",
+    "Dia de la Madre",
+    "Dia de la Madre-1",
+    "Primer dia del ano-1",
+]
 
 
 def prep_train_df(
@@ -19,12 +46,12 @@ def prep_train_df(
     """Preprocesses the main sales dataset by parsing dates, casting types,
     generating temporal and lag features and getting the sales types for each family.
     """
-    df = df.sort_values(["store_nbr", "family", "date"]).reset_index(drop=True)
 
     df["date"] = pd.to_datetime(df["date"])
-    df["onpromotion"] = df["onpromotion"].astype("category")
-    df["store_nbr"] = df["store_nbr"].astype("category")
-    df["family"] = df["family"].astype("category")
+
+    df = fulfill_sales(df)
+
+    df["day"] = df["date"].dt.day
     df["weekday"] = df["date"].dt.day_of_week
     df["month"] = df["date"].dt.month
     df["week"] = df["date"].dt.isocalendar().week
@@ -41,11 +68,35 @@ def prep_train_df(
     family_has_decimals = is_decimal.groupby(df["family"], observed=True).any()
     df["is_int_sales"] = df["family"].map(~family_has_decimals)
 
+    df = df.drop(columns="id")
+
+    df["family"] = df["family"].astype("category")
+
+    return df
+
+
+def fulfill_sales(df: pd.DataFrame):
+    """Fulfill days without sales"""
+
+    df_stores = pd.DataFrame({"store_nbr": df["store_nbr"].unique()})
+    df_families = pd.DataFrame({"family": df["family"].unique()})
+    df_dates = pd.DataFrame({"date": pd.date_range(df["date"].min(), df["date"].max())})
+
+    df_calendar = df_stores.merge(df_families, how="cross").merge(df_dates, how="cross")
+
+    df = df_calendar.merge(df, on=["store_nbr", "family", "date"], how="left")
+
+    df["sales_missing"] = df["sales"].isna().astype(int)
+
+    df["sales"] = df["sales"].fillna(0)
+    df["onpromotion"] = df["onpromotion"].fillna(0)
     return df
 
 
 def prep_train_get_lags(df: pd.DataFrame, lags: list[int]) -> pd.DataFrame:
     """Computes sales lags grouped by store and product family."""
+
+    df = df.sort_values(["family", "store_nbr", "date"]).reset_index(drop=True)
     for i in lags:
         df[f"sales_lag{i}"] = df.groupby(["family", "store_nbr"])["sales"].shift(i)
     return df
@@ -67,11 +118,8 @@ def prep_oil_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def prep_stores_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocesses the main sales dataset by casting types"""
+    """Preprocesses the main sales dataset"""
 
-    df["store_nbr"] = df["store_nbr"].astype("category")
-    df["cluster"] = df["cluster"].astype("category")
-    df["type"] = df["type"].astype("category")
     df = df.rename(columns={"type": "store_type", "cluster": "store_cluster"})
 
     return df
@@ -81,7 +129,6 @@ def prep_transactions_df(transactions: pd.DataFrame) -> pd.DataFrame:
     """Add transactions data"""
 
     transactions["date"] = pd.to_datetime(transactions["date"])
-    transactions["store_nbr"] = transactions["store_nbr"].astype("category")
 
     return transactions
 
@@ -93,6 +140,75 @@ def prep_holiday_df(holidays_events: pd.DataFrame) -> pd.DataFrame:
     holidays_events = holidays_events[holidays_events["transferred"] == False]
 
     return holidays_events
+
+
+def holiday_transfrom_and_join(df: pd.DataFrame, df_holiday_events: pd.DataFrame):
+
+    city_holidays = df_holiday_events[df_holiday_events["locale"] == "Local"]
+    national_holidays = df_holiday_events[df_holiday_events["locale"] == "National"]
+    regional_holidays = df_holiday_events[df_holiday_events["locale"] == "Regional"]
+
+    df = df.merge(
+        city_holidays[["date", "locale_name", "description", "type"]],
+        how="left",
+        left_on=["date", "city"],
+        right_on=["date", "locale_name"],
+    )
+
+    df = df.merge(
+        regional_holidays[["date", "locale_name", "description", "type"]],
+        how="left",
+        left_on=["date", "state"],
+        right_on=["date", "locale_name"],
+    )
+
+    df = df.merge(
+        national_holidays[["date", "locale_name", "description", "type"]],
+        how="left",
+        left_on=["date"],
+        right_on=["date"],
+    )
+
+    holiday_cols = [col for col in df.columns if col.startswith("locale")]
+    description_cols = [col for col in df.columns if col.startswith("description")]
+    type_cols = [col for col in df.columns if col.startswith("type")]
+
+    df["is_holiday"] = df[holiday_cols].notna().any(axis=1).astype(int)
+
+    df["holiday_locale"] = (
+        df["locale_name_x"].fillna(df["locale_name_y"]).fillna(df["locale_name"])
+    )
+    df["holiday_description"] = (
+        df["description_x"]
+        .fillna(df["description_y"])
+        .fillna(df["description"])
+        .fillna("Normal Day")
+    )
+    df["holiday_type"] = df["type_x"].fillna(df["type_y"]).fillna(df["type"])
+
+    df = df.drop(columns=holiday_cols + description_cols + type_cols)
+
+    df["is_earthquake_manabi"] = (
+        df["holiday_description"]
+        .str.startswith("Terremoto Manabi", na=False)
+        .astype(int)
+    )
+    df["is_closed"] = (df["holiday_description"] == "Navidad").astype(int)
+    df["is_drastic_drop"] = (df["holiday_description"] == "Primer dia del ano").astype(
+        int
+    )
+
+    df["is_commercial_spike"] = (
+        df["holiday_description"].str.startswith("Navidad", na=False)
+        | df["holiday_description"].isin(COMMERCIAL_SPIKE_LIST)
+    ).astype(int)
+
+    df["is_regular_holiday"] = (
+        df["holiday_description"].isin(REGULAR_HOLIDAY_LIST)
+        | df["holiday_description"].str.contains("futbol Brasil", na=False, case=False)
+    ).astype(int)
+
+    return df
 
 
 def prep_joins(
@@ -107,34 +223,8 @@ def prep_joins(
     # Joins the sales history dataset with the stores dataset
     df = df_sales.merge(df_stores, how="left", on=["store_nbr"])
 
-    # Joins with the holidays dataset
-    city_holidays = df_holiday_events[df_holiday_events["locale"] == "Local"]
-    national_holidays = df_holiday_events[df_holiday_events["locale"] == "National"]
-    regional_holidays = df_holiday_events[df_holiday_events["locale"] == "Regional"]
-
-    df = df.merge(
-        city_holidays[["date", "locale_name"]],
-        how="left",
-        left_on=["date", "city"],
-        right_on=["date", "locale_name"],
-    )
-    df = df.merge(
-        regional_holidays[["date", "locale_name"]],
-        how="left",
-        left_on=["date", "state"],
-        right_on=["date", "locale_name"],
-    )
-    df = df.merge(
-        national_holidays[["date", "locale_name"]],
-        how="left",
-        left_on=["date"],
-        right_on=["date"],
-    )
-
-    holiday_cols = ["locale_name_x", "locale_name_y", "locale_name"]
-    df["is_holiday"] = df[holiday_cols].notna().any(axis=1).astype(int)
-
-    df = df.drop(columns=holiday_cols)
+    # Joins and transform with the holidays dataset
+    df = holiday_transfrom_and_join(df, df_holiday_events)
 
     # Joins with oil dataset
     df = df.merge(df_oil, on="date", how="left")

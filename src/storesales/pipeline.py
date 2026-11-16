@@ -1,11 +1,10 @@
 import os
-import json
 import mlflow
 import pandas as pd
 
-from src.storesales.training import train_predict_evaluate
-from src.storesales.visualization import generate_and_log_plots
-from src.storesales.models import (
+from storesales.training import train_predict_evaluate
+from storesales.visualization import generate_and_log_plots
+from storesales.models import (
     get_linear_regression_pipeline,
     get_xgboost_model,
     get_lightgbm_model,
@@ -22,7 +21,9 @@ def run_experiment(
     model_name: str,
     skewed_feats: list,
     normal_feats: list,
+    tier_feats: list,
     cat_feats: list,
+    target_encoder: bool,
     target: str,
     cols_to_keep: list,
     cutoffs: list,
@@ -35,32 +36,42 @@ def run_experiment(
     to_plot_cutoff: str = "2017-07-15",
 ):
     df = pd.read_parquet(df_path)
-    features = skewed_feats + normal_feats + cat_feats
 
     for cat in cat_feats:
         df[cat] = df[cat].astype("category")
 
+    tier_cols = [f"{col}_volume_tier" for col in tier_feats] if tier_feats else []
+    features = skewed_feats + normal_feats + cat_feats + tier_cols
+
     selected_model = MODEL_REGISTRY[model_name]
-    model_instance = selected_model(skewed_feats, normal_feats, cat_feats)
+    model_instance = selected_model(
+        skewed_feats, normal_feats, tier_feats, cat_feats, target_encoder
+    )
+
     run_name = f"{model_name}_{issue_name}_{version_name}"
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-    db_path = os.path.join(project_root, "mlflow.db")
     artifacts_dir = os.path.join(project_root, "artifacts")
-    mlruns_dir = os.path.join(project_root, "mlruns")
     results_path = os.path.join(artifacts_dir, f"predictions/pred_{run_name}.parquet")
 
+    # Rutas absolutas para MLflow
+    db_path = os.path.join(project_root, "mlflow.db")
+    mlruns_dir = os.path.join(project_root, "mlruns")
+
+    # 1. Conectar a la base de datos principal
     mlflow.set_tracking_uri(f"sqlite:///{db_path}")
 
-    client = mlflow.tracking.MlflowClient()
     experiment_name = "Store_Sales_Forecasting"
-    experiment = client.get_experiment_by_name(experiment_name)
+    client = mlflow.tracking.MlflowClient()
 
+    # 2. Replicamos tu lógica infalible para fijar la ruta de artifacts en la raíz
+    experiment = client.get_experiment_by_name(experiment_name)
     if experiment is None:
         client.create_experiment(
-            experiment_name, artifact_location=f"file://{mlruns_dir}"
+            name=experiment_name, artifact_location=f"file://{mlruns_dir}"
         )
 
+    # 3. Activamos el experimento
     mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run(run_name=run_name):
@@ -69,33 +80,34 @@ def run_experiment(
         dataset = mlflow.data.from_pandas(df, source=df_path, name=dataset_name)
         mlflow.log_input(dataset, context="training")
 
-        mlflow.set_tag("issue", issue_name)
-        mlflow.set_tag("version", version_name)
+        mlflow.set_tags({"issue": issue_name, "version": version_name, "data": "valid"})
 
-        mlflow.log_param("model_type", model_name)
-        mlflow.log_param("horizon_days", horizon)
-        mlflow.log_param("total_features", len(features))
-        mlflow.log_param("cutoff", [str(c.date()) for c in cutoffs])
+        mlflow.log_params(
+            {
+                "model_type": model_name,
+                "horizon_days": horizon,
+                "total_features": len(features),
+                "target_encoder": target_encoder,
+                "cutoff": [str(c)[:10] for c in cutoffs],
+            }
+        )
 
-        algo = model_instance.named_steps["model"]
-        mlflow.log_params(algo.get_params())
+        algo_wrapper = model_instance.named_steps["model"]
+        base_algo = algo_wrapper.regressor
+        mlflow.log_params(base_algo.get_params())
 
-        os.makedirs(artifacts_dir, exist_ok=True)
-        features_path = os.path.join(artifacts_dir, "features_list_temp.json")
+        mlflow.log_dict({"features": features}, "metadata/features_list.json")
 
-        with open(features_path, "w") as f:
-            json.dump({"features": features}, f, indent=4)
-
-        mlflow.log_artifact(features_path, "metadata")
-
-        df_results, last_trained_model = train_predict_evaluate(
+        df_results, trained_models = train_predict_evaluate(
             df,
             selected_model,
             cutoffs,
             horizon,
             skewed_feats,
             normal_feats,
+            tier_feats,
             cat_feats,
+            target_encoder,
             target,
             cols_to_keep,
         )
@@ -110,8 +122,9 @@ def run_experiment(
             "cutoff": to_plot_cutoff,
         }
 
+        last_trained_model = list(trained_models.values())[-1]
         generate_and_log_plots(
             df=df, df_results=df_results, model=last_trained_model, config=plot_config
         )
 
-    return df_results
+    return df_results, trained_models

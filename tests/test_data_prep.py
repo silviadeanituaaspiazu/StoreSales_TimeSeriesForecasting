@@ -74,9 +74,36 @@ def test_preprocessing_main_pipeline():
     assert len(df_final) <= len(train_raw), "Too many rows."
 
     # 2. Missing values check
+    cols_to_check = [
+        "store_nbr",
+        "family",
+        "date",
+        "sales",
+        "onpromotion",
+        "sales_missing",
+        "weekday",
+        "month",
+        "week",
+        "year",
+        "is_int_sales",
+        "city",
+        "state",
+        "store_type",
+        "store_cluster",
+        "is_holiday",
+        "is_earthquake_manabi",
+        "is_closed",
+        "is_drastic_drop",
+        "is_commercial_spike",
+        "is_regular_holiday",
+        "dcoilwtico",
+    ]
+    cols_with_nans = (
+        df_final[cols_to_check].columns[df_final[cols_to_check].isna().any()].tolist()
+    )
     assert (
-        df_final["dcoilwtico"].isna().sum() == 0
-    ), "The pipeline failed to fill missing values in oil prices."
+        len(cols_with_nans) == 0
+    ), f"Pipeline failed! Missing values found in: {cols_with_nans}"
 
     # 3. Data type checks
     assert (
