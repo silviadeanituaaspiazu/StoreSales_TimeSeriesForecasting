@@ -94,6 +94,7 @@ def get_xgboost_model(
         verbosity=0,
         enable_categorical=True,
         tree_method="hist",
+        # objective="reg:tweedie"
     )
 
     model = TransformedTargetRegressor(

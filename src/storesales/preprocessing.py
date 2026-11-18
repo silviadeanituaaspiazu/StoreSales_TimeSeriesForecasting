@@ -9,7 +9,7 @@ PATH_OIL_DATA = "data/raw/oil.csv"
 
 PATH_OUTPUT = "data/processed/df_train.parquet"
 
-LAGS = [15, 16, 17, 18, 19, 20, 21, 30, 60, 90, 364, 365]
+LAGS = [15, 16, 17, 18, 19, 20, 21, 28, 30, 60, 90, 364, 365]
 
 REGULAR_HOLIDAY_LIST = [
     "Carnaval",
