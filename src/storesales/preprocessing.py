@@ -136,7 +136,6 @@ def prep_holiday_df(holidays_events: pd.DataFrame) -> pd.DataFrame:
     """Add holiday_events data"""
 
     holidays_events["date"] = pd.to_datetime(holidays_events["date"])
-    holidays_events = holidays_events[holidays_events["transferred"] == False]
 
     return holidays_events
 
