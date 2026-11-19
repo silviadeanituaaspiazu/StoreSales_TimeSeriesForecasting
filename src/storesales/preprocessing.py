@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import os
 
 PATH_SALES_DATA = "data/raw/train.csv"
@@ -10,7 +9,7 @@ PATH_OIL_DATA = "data/raw/oil.csv"
 
 PATH_OUTPUT = "data/processed/df_train.parquet"
 
-LAGS = [15, 16, 17, 18, 19, 20, 30, 60, 90, 364, 365]
+LAGS = [15, 16, 17, 18, 19, 20, 21, 28, 30, 60, 90, 364, 365]
 
 REGULAR_HOLIDAY_LIST = [
     "Carnaval",
@@ -137,36 +136,58 @@ def prep_holiday_df(holidays_events: pd.DataFrame) -> pd.DataFrame:
     """Add holiday_events data"""
 
     holidays_events["date"] = pd.to_datetime(holidays_events["date"])
-    holidays_events = holidays_events[holidays_events["transferred"] == False]
 
     return holidays_events
 
 
 def holiday_transfrom_and_join(df: pd.DataFrame, df_holiday_events: pd.DataFrame):
+    h = df_holiday_events.copy()
 
-    city_holidays = df_holiday_events[df_holiday_events["locale"] == "Local"]
-    national_holidays = df_holiday_events[df_holiday_events["locale"] == "National"]
-    regional_holidays = df_holiday_events[df_holiday_events["locale"] == "Regional"]
+    h["is_earthquake_manabi"] = (
+        h["description"].str.startswith("Terremoto Manabi", na=False).astype(int)
+    )
+    h["is_closed"] = (h["description"] == "Navidad").astype(int)
+    h["is_drastic_drop"] = (h["description"] == "Primer dia del ano").astype(int)
+    h["is_commercial_spike"] = (
+        h["description"].str.startswith("Navidad", na=False)
+        | h["description"].isin(COMMERCIAL_SPIKE_LIST)
+    ).astype(int)
+    h["is_regular_holiday"] = (
+        h["description"].isin(REGULAR_HOLIDAY_LIST)
+        | h["description"].str.contains("futbol Brasil", na=False, case=False)
+    ).astype(int)
+
+    flag_cols = [
+        "is_earthquake_manabi",
+        "is_closed",
+        "is_drastic_drop",
+        "is_commercial_spike",
+        "is_regular_holiday",
+    ]
+    cols_to_merge = ["date", "locale_name", "description", "type"] + flag_cols
+
+    h = h.groupby(["date", "locale", "locale_name"], as_index=False).max()
+
+    city_holidays = h[h["locale"] == "Local"]
+    regional_holidays = h[h["locale"] == "Regional"]
+    national_holidays = h[h["locale"] == "National"]
 
     df = df.merge(
-        city_holidays[["date", "locale_name", "description", "type"]],
+        city_holidays[cols_to_merge],
         how="left",
         left_on=["date", "city"],
         right_on=["date", "locale_name"],
     )
-
     df = df.merge(
-        regional_holidays[["date", "locale_name", "description", "type"]],
+        regional_holidays[cols_to_merge],
         how="left",
         left_on=["date", "state"],
         right_on=["date", "locale_name"],
     )
-
     df = df.merge(
-        national_holidays[["date", "locale_name", "description", "type"]],
+        national_holidays[cols_to_merge],
         how="left",
-        left_on=["date"],
-        right_on=["date"],
+        on="date",
     )
 
     holiday_cols = [col for col in df.columns if col.startswith("locale")]
@@ -174,7 +195,6 @@ def holiday_transfrom_and_join(df: pd.DataFrame, df_holiday_events: pd.DataFrame
     type_cols = [col for col in df.columns if col.startswith("type")]
 
     df["is_holiday"] = df[holiday_cols].notna().any(axis=1).astype(int)
-
     df["holiday_locale"] = (
         df["locale_name_x"].fillna(df["locale_name_y"]).fillna(df["locale_name"])
     )
@@ -188,25 +208,9 @@ def holiday_transfrom_and_join(df: pd.DataFrame, df_holiday_events: pd.DataFrame
 
     df = df.drop(columns=holiday_cols + description_cols + type_cols)
 
-    df["is_earthquake_manabi"] = (
-        df["holiday_description"]
-        .str.startswith("Terremoto Manabi", na=False)
-        .astype(int)
-    )
-    df["is_closed"] = (df["holiday_description"] == "Navidad").astype(int)
-    df["is_drastic_drop"] = (df["holiday_description"] == "Primer dia del ano").astype(
-        int
-    )
-
-    df["is_commercial_spike"] = (
-        df["holiday_description"].str.startswith("Navidad", na=False)
-        | df["holiday_description"].isin(COMMERCIAL_SPIKE_LIST)
-    ).astype(int)
-
-    df["is_regular_holiday"] = (
-        df["holiday_description"].isin(REGULAR_HOLIDAY_LIST)
-        | df["holiday_description"].str.contains("futbol Brasil", na=False, case=False)
-    ).astype(int)
+    for col in flag_cols:
+        df[col] = df[[f"{col}_x", f"{col}_y", col]].max(axis=1).fillna(0).astype(int)
+        df = df.drop(columns=[f"{col}_x", f"{col}_y"])
 
     return df
 

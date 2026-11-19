@@ -137,7 +137,7 @@ def plot_predictions(
     cutoff: str,
     root_artifacts: str,
 ):
-    plot_path = os.path.join(root_artifacts, "plot_predictions_temp.png")
+
     cutoff = pd.to_datetime(cutoff)
 
     df_results_filtered = df_results[
@@ -203,10 +203,14 @@ def plot_predictions(
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    plt.savefig(plot_path, dpi=150, bbox_inches="tight")
-    plt.close()
+    if root_artifacts is not None:
+        plot_path = os.path.join(root_artifacts, "plot_predictions_temp.png")
+        plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+        plt.close()
+        return plot_path
 
-    return plot_path
+    plt.show()
+    return None
 
 
 def generate_and_log_plots(df, df_results, model, config):
