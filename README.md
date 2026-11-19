@@ -2,9 +2,10 @@
 
 > **WORK IN PROGRESS:** *This project is currently under active development.*
 
-An end-to-end machine learning project to predict store sales for Corporación Favorita (Ecuador). 
+An end-to-end machine learning project to predict store sales for Corporación Favorita (Ecuador), using historical daily data across 54 stores and 33 product families (2013–2017) from the [Kaggle Store Sales competition](https://www.kaggle.com/competitions/store-sales-time-series-forecasting).
 
-This project goes beyond standard Jupyter Notebook experimentation by wrapping the entire data science lifecycle in a production-ready MLOps architecture. By prioritizing testability, it ensures that the EDA and modeling phases are built on a highly reliable data foundation.
+This project goes beyond standard Jupyter Notebook experimentation by applying software engineering best practices—modular code, automated testing, and Continuous Integration (CI). By prioritizing testability, it ensures that the EDA and modeling phases are built on a highly reliable data foundation.
+
 
 ## Business Problem
 
@@ -12,52 +13,127 @@ Accurate forecasting of product sales is critical for brick-and-mortar grocery r
 
 ## Project Lifecycle
 
-1. **Robust Data Pipeline (Completed):** Modularized data preprocessing with automated end-to-end testing to prevent data leakage, handle missing values, and avoid merge explosions.
-2. **Exploratory Data Analysis (WIP):** Deep dive into seasonality, store clustering, holiday impacts, and long-term sales trends.
-3. **Feature Engineering (WIP):** Implementation of dynamic lag variables, rolling windows, and domain-specific time features.
-4. **Modeling & Evaluation (WIP):** Algorithm selection (e.g., XGBoost, LightGBM), strict time-series cross-validation, and RMSLE optimization.
+1. **Data Pipeline (Completed):** Modular preprocessing pipeline with automated tests to prevent data leakage, handle missing dates, and avoid merge explosions.
+2. **Exploratory Data Analysis (Completed):** Analysis of long-term sales trends, geographic concentration, product family dispersion, and weekly seasonality.
+3. **Baseline Modeling & Diagnostics (Completed):** Strict temporal validation setup (4 cutoffs, 15-day horizon) and parsimonious autoregressive XGBoost baseline.
+4. **Feature Engineering & Error Analysis (Completed):** Systematic evaluation of temporal, store, family, and event features, plus diagnostic breakdown of remaining model bottlenecks.
+5. **Advanced Modeling & Evaluation (In Progress):** Addressing structural limitations (trend extrapolation, zero-inflated demand, and negative bias) before incorporating external regressors.
+
+
+## Exploratory Data Analysis (EDA)
+
+The aggregated view of the time series reveals a clear upward trend in sales. This growth over time already points to a key challenge for the modeling phase: the inability of gradient boosting models to extrapolate beyond historical values.
+
+<p align="center">
+  <img src="images/figure21.png" alt="Aggregated Sales Trend" width="1000">
+  <br>
+  <em>Figure 1: Aggregated sales trend over time.</em>
+</p>
+
+Beyond the overall trend, the sales distribution is highly uneven across three main dimensions:
+
+**Location:** More than 50% of total sales are concentrated in Quito, the capital.
+
+<p align="center">
+  <img src="images/figure20.png" alt="Sales Distribution by City" width="600">
+  <br>
+  <em>Figure 2: Sales distribution by city.</em>
+</p>
+
+**Product Family:** Demand varies drastically by category; some families barely sell (e.g., `BOOKS`), while the top performer reaches around 60M in sales in a single year.
+
+<p align="center">
+  <img src="images/figure19.png" alt="Top and Bottom Product Families by Sales" width="1000">
+  <br>
+  <em>Figure 3: Top and bottom product families by sales.</em>
+</p>
+
+**Day of the Week:** Sales also depend heavily on the weekday, peaking over the weekend (especially on Sundays) and dropping during the rest of the week.
+
+<p align="center">
+  <img src="images/figure22.png" alt="Median Sales by Day of the Week" width="800">
+  <br>
+  <em>Figure 4: Median sales by day of the week.</em>
+</p>
+
+## Baseline Modeling & Diagnostics
+
+Before engineering complex features, a strict temporal validation framework was established to mirror production forecasting constraints and prevent data leakage:
+- **Validation Strategy:** 4 temporal cutoffs (`2016-09-15`, `2017-01-15`, `2017-04-15`, `2017-07-15`) with a **15-day forecast horizon**.
+- **Baseline Architecture:** An XGBoost regressor trained on `log1p(sales)` using a parsimonious 4-lag setup (`[15, 21, 28, 364]`), chosen via ACF/PACF analysis to capture recent inertia as well as weekly and yearly seasonality.
+
+| Model | Features | Global RMSLE | Bias |
+| :--- | :--- | :---: | :---: |
+| XGBoost (Minimal) | 3 Lags (`15, 21, 364`) | 0.559 | -21.1 |
+| **XGBoost (Selected Baseline)** | **4 Lags (`15, 21, 28, 364`)** | **0.545** | **-22.4** |
+| XGBoost (Dense) | 12 Lags (`[15-21], 28, 30, 60, 364, 365`) | 0.537 | -14.2 |
+
+> 👉 **[Read the full Baseline Modeling & Diagnostics report](docs/01_modeling_baseline.md)**
+
+### Current Results
+
+To make the baseline performance concrete, the charts below show 15-day predictions for two contrasting store–family series: a high-volume, regular category where the 4-lag model captures weekly seasonality well while still showing underestimation bias, and a low-volume case that illustrates current limitations with zero-sales handling.
+
+<p align="center">
+  <img src="images/figure24.png" alt="Actual vs. predicted 15-day sales showing underestimation" width="100%">
+  <br>
+  <em>Figure 5: 15-day forecast example — underestimation bias.</em>
+</p>
+
+<p align="center">
+  <img src="images/figure23.png" alt="Actual vs. predicted 15-day sales showing zero-sales handling" width="100%">
+  <br>
+  <em>Figure 6: 15-day forecast example — zero-sales handling.</em>
+</p>
+
+
+## Feature Engineering & Error Analysis
+
+Expanding the feature space systematically revealed that adding more variables does not automatically improve performance when strong lags are already present:
+- **Time, Store & Family Features:** Evaluating multiple encoding strategies (Native Categorical, Target Encoding, Ordinal, Temporal Binning, OHE) did not outperform the 4-lag baseline, confirming that historical lags already absorb most baseline seasonality and store/product scale.
+- **Event Heterogeneity:** Analysis of holidays, commercial spikes (e.g., Black Friday, Mother's Day), and the April 2016 earthquake showed highly uneven effects across regions, post-event days, and product families, demonstrating that simple global flags are insufficient.
+- **Key Bottlenecks Identified:** Diagnostics point to structural model limitations rather than a lack of external variables: inability to extrapolate upward trends, zero-sales handling, and systematic negative bias from optimizing MSE in `log1p` space.
+
+**Next Modeling Iteration:** Prioritize structural fixes—a hybrid linear + XGBoost approach for extrapolation, Tweedie/Poisson objectives on raw sales (monitoring the RMSLE trade-off), and a hurdle model for zero-inflated demand—before incorporating `oil` prices, lagged `transactions`, and more complex feature engineering.
+
+> 👉 **[Read the full Feature Engineering report](docs/02_feature_engineering.md)**
+
 
 ## Engineering Approach & Stack
 
-- **Dependency Management:** [Poetry](https://python-poetry.org/) (guarantees deterministic builds via `poetry.lock`).
-- **Data Pipeline:** Modularized `src-layout` separating pure logic (transformations) from I/O operations (reading/writing).
-- **Automated Testing:** `pytest` suite simulating edge cases (missing dates, merge explosions, data type casting).
-- **Code Quality:** Automated formatting enforced by `Black`.
-- **CI/CD:** GitHub Actions workflow triggers on every push/PR to run tests and format checks on ephemeral Linux runners.
+- **Data & Modeling:** Python, Pandas, XGBoost, Statsmodels, Matplotlib, Plotly, and MLflow for experiment tracking.
+- **Dependency Management:** [Poetry](https://python-poetry.org/) for deterministic, reproducible environments (`poetry.lock`).
+- **Modular Architecture:** Standard `src-layout` separating core transformation logic from I/O operations.
+- **Automated Testing:** `pytest` suite covering edge cases such as missing dates, merge explosions, and type casting.
+- **Code Quality:** Consistent formatting enforced via `Black`.
+- **Continuous Integration (CI):** GitHub Actions runs automated tests and formatting checks on every push and pull request.
+
+## Repository Structure
+
+```text
+├── .github/workflows/   # CI pipeline (pytest + Black checks)
+├── docs/                # Technical reports (Baseline Modeling, Feature Engineering)
+├── images/              # Static figures used in reports and README
+├── notebooks/           # Exploratory and experimental notebooks
+├── src/storesales/      # Modular preprocessing and pipeline code
+├── tests/               # Automated pytest suite
+└── pyproject.toml       # Poetry configuration and dependencies
+```
 
 ## Running the Pipeline
 
 This project uses Poetry for environment management. To reproduce the environment and run the data pipeline:
 
+1. Download the competition CSV files from [Kaggle](https://www.kaggle.com/competitions/store-sales-time-series-forecasting/data) and place them inside `data/raw/`.
+2. Install dependencies, run the test suite, and generate the processed dataset:
+
 ```bash
-# 1. Install dependencies
+# Install dependencies
 poetry install
 
-# 2. Run the test suite (validates data logic and edge cases)
+# Run the test suite (validates data logic and edge cases)
 poetry run pytest -v
 
-# 3. Generate the processed master table (.parquet)
+# Generate the processed master table (.parquet)
 poetry run python src/storesales/preprocessing.py
 ```
-
----
-
-## Roadmap & TODOs
-
-### Exploratory Data Analysis (EDA)
-- View and plot the aggregated full time series. 
-- Map visualization of sales volume by store location. 
-- Plot total sales for Top 10 and Bottom 10 product families. 
-- Plot total sales for Top 10 and Bottom 10 stores. 
-- Compare seasonality patterns between top-performing and underperforming families. 
-- Plot sales distribution histogram.
-
-### Feature Engineering
-
-### Modeling
-
-### Results
-- Display an example prediction output. 
-- Plot feature importance. 
-- Plot Actual vs. Predicted values. 
-- Analyze and plot the residuals distribution.
