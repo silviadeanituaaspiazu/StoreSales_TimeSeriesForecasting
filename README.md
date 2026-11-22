@@ -16,8 +16,8 @@ Accurate forecasting of product sales is critical for brick-and-mortar grocery r
 1. **Data Pipeline (Completed):** Modular preprocessing pipeline with automated tests to prevent data leakage, handle missing dates, and avoid merge explosions.
 2. **Exploratory Data Analysis (Completed):** Analysis of long-term sales trends, geographic concentration, product family dispersion, and weekly seasonality.
 3. **Baseline Modeling & Diagnostics (Completed):** Strict temporal validation setup (4 cutoffs, 15-day horizon) and parsimonious autoregressive XGBoost baseline.
-4. **Feature Engineering & Error Analysis (Completed):** Systematic evaluation of temporal, store, family, and event features, plus diagnostic breakdown of remaining model bottlenecks.
-5. **Advanced Modeling & Evaluation (In Progress):** Addressing structural limitations (trend extrapolation, zero-inflated demand, and negative bias) before incorporating external regressors.
+4. **Feature Engineering & Error Analysis (Completed):** Systematic evaluation of temporal, store, family, event, and promotion features, reducing Global RMSLE from `0.545` to `0.485`.
+5. **Advanced Modeling & Evaluation (In Progress):** Addressing structural limitations (trend extrapolation, zero-inflated demand, and bias calibration) before incorporating external regressors.
 
 
 ## Exploratory Data Analysis (EDA)
@@ -89,10 +89,17 @@ To make the baseline performance concrete, the charts below show 15-day predicti
 
 ## Feature Engineering & Error Analysis
 
-Expanding the feature space systematically revealed that adding more variables does not automatically improve performance when strong lags are already present:
-- **Time, Store & Family Features:** Evaluating multiple encoding strategies (Native Categorical, Target Encoding, Ordinal, Temporal Binning, OHE) did not outperform the 4-lag baseline, confirming that historical lags already absorb most baseline seasonality and store/product scale.
-- **Event Heterogeneity:** Analysis of holidays, commercial spikes (e.g., Black Friday, Mother's Day), and the April 2016 earthquake showed highly uneven effects across regions, post-event days, and product families, demonstrating that simple global flags are insufficient.
-- **Key Bottlenecks Identified:** Diagnostics point to structural model limitations rather than a lack of external variables: inability to extrapolate upward trends, zero-sales handling, and systematic negative bias from optimizing MSE in `log1p` space.
+Expanding the feature space systematically revealed that adding more variables does not automatically improve performance when strong lags are already present—but targeted exogenous features deliver substantial gains:
+- **Time, Store & Family Features:** Evaluating multiple encoding strategies (Native Categorical, Target Encoding, Ordinal, Temporal Binning, OHE) did not outperform the 4-lag baseline on their own, confirming that historical lags already absorb most baseline seasonality and store/product scale.
+- **Events & Holidays:** Analysis of holidays, commercial spikes (e.g., Black Friday, Mother's Day), and the April 2016 earthquake showed highly uneven effects across regions, post-event days, and product families, demonstrating that simple global flags are insufficient. Combining the 5 core event flags with `day` as a categorical feature improved RMSLE to `0.542` and cut bias from `-22.0` to `-7.7`.
+- **Promotions:** Incorporating `onpromotion` as a numerical variable proved to be the single most impactful feature, reducing Global RMSLE to **`0.485`** (~10.5% improvement over the events model) while shifting bias to `+10.0`.
+- **Key Bottlenecks Identified:** Diagnostics point to structural model limitations—most notably the inability to extrapolate upward trends, zero-sales handling, and bias calibration from optimizing MSE in `log1p` space.
+
+| Iteration | Feature Set | Global RMSLE | Bias |
+| :--- | :--- | :---: | :---: |
+| Baseline | 4 Lags (`15, 21, 28, 364`) | 0.545 | -22.0 |
+| + Calendar Events | 4 Lags + 5 Events + CAT (`day`) | 0.542 | -7.7 |
+| **+ Promotions** | **4 Lags + 5 Events + CAT (`day`) + `onpromotion`** | **0.485** | **+10.0** |
 
 **Next Modeling Iteration:** Prioritize structural fixes—a hybrid linear + XGBoost approach for extrapolation, Tweedie/Poisson objectives on raw sales (monitoring the RMSLE trade-off), and a hurdle model for zero-inflated demand—before incorporating `oil` prices, lagged `transactions`, and more complex feature engineering.
 
